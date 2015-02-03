@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(udrone C CXX)
-
+cmake_policy(SET CMP0015 NEW)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -122,18 +122,19 @@ include_directories(
 # add_library(gateway_msg
 #   src/${PROJECT_NAME}/gateway_msg.cpp
 # )
-add_executable(localize_drone_node src/localize_drone_node.cpp)
 
 ## Declare a cpp executable
+add_executable(localize_drone_node src/localize_drone_node.cpp)
+
 add_dependencies(localize_drone_node ${PROJECT_NAME}_gencfg)
 
 #link_directories(/home/withniu/catkin_ws/src/ncvrl_ros/gateway_msg/lib)
-link_directories(/home/withniu/catkin_ws/src/udrone/lib)
-#add_library(${CMAKE_SOURCE_DIR}/libapriltag.a STATIC IMPORTED)
+link_directories(${CMAKE_SOURCE_DIR}/udrone/lib)
+#add_library(${CMAKE_SOURCE_DIR}/udrone/lib/libapriltag.a STATIC IMPORTED)
 
 target_link_libraries(localize_drone_node
    ${catkin_LIBRARIES}
    ${OpenCV_LIBS}
-   /home/withniu/catkin_ws/src/udrone/lib/libapriltag.a
+   ${CMAKE_SOURCE_DIR}/udrone/lib/libapriltag.a
    )
 
