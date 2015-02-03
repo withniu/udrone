@@ -141,7 +141,7 @@ public:
     //static bool first_time = true;
     static int counter = 0; 
     cv_bridge::CvImageConstPtr img_ptr = cv_bridge::toCvShare(msg);
-    
+    // Initialize background   
     if (counter == 0)
     {
       cv::Mat depth = img_ptr->image;
@@ -164,13 +164,27 @@ public:
       return;
     }
     
+    // Segment quad
     cv::Mat img_diff, img_mask;
     cv::absdiff(img_ptr->image, depth_bg_, img_diff);
     cv::threshold(img_diff, img_mask, 0.5, 255, 0);
 
-    
+    // Erosion
+    int erosion_size = 5;
+    cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+                                                cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+                                                cv::Point(erosion_size, erosion_size));
+
+    cv::erode(img_mask, img_mask, element);
+
+    std::vector<cv::Point2f> contours;
+    cv::findContours(img_mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+
+
+    // Vis
     img_diff.convertTo(img_diff, CV_8UC1, 255.0);
     //std::cout << img_diff << std::endl;
+    cv::drawContours(img_mask, contours, -1, cv::Scalar(0, 0, 255), 2);
     cv::imshow("diff", img_mask);
     cv::waitKey(1);
     //    sensor_msgs::ImagePtr msg_diff = cv_bridge::CvImage(msg->header, "mono8", img_diff).toImageMsg();
