@@ -149,7 +149,7 @@ public:
       counter++;
       return;
     }
-    else if (counter < 200)
+    else if (counter < 20)
     {
       cv::Mat depth = img_ptr->image;
       for (int r = 0; r < depth.rows; ++r)
@@ -169,6 +169,10 @@ public:
     cv::absdiff(img_ptr->image, depth_bg_, img_diff);
     cv::threshold(img_diff, img_mask, 0.5, 255, 0);
 
+    img_mask.convertTo(img_mask, CV_8UC1);
+    
+    
+    cv::imshow("mask_raw", img_mask);
     // Erosion
     int erosion_size = 5;
     cv::Mat element = cv::getStructuringElement(cv::MORPH_ELLIPSE,
@@ -177,15 +181,55 @@ public:
 
     cv::erode(img_mask, img_mask, element);
 
-    std::vector<cv::Point2f> contours;
-    cv::findContours(img_mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+    cv::dilate(img_mask, img_mask, element);
+    cv::imshow("mask_erosion", img_mask);
+
+
+    std::vector<std::vector<cv::Point> > contours;
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(img_mask, contours, hierarchy, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+
+      /// Approximate contours to polygons + get bounding rects and circles
+    std::vector<std::vector<cv::Point> > contours_poly( contours.size() );
+    std::vector<cv::Rect> bboxes( contours.size() );
+
+    for( int i = 0; i < contours.size(); i++ )
+    { 
+      cv::approxPolyDP( cv::Mat(contours[i]), contours_poly[i], 3, true );
+      bboxes[i] = cv::boundingRect( cv::Mat(contours_poly[i]) );
+    }
+
+    img_diff.convertTo(img_diff, CV_8UC1, 255.0);
+    cv::RNG rng(12345);
+    /// Draw polygonal contour + bonding rects + circles
+    for( int i = 0; i< contours.size(); i++ )
+    {
+      cv::Scalar color = cv::Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+      cv::drawContours( img_, contours_poly, i, color, 1, 8, cv::vector<cv::Vec4i>(), 0, cv::Point() );
+      cv::Rect bbox = bboxes[i] - cv::Point(15, 15)+ cv::Size(30, 30);
+      cv::rectangle( img_, bbox.tl(), bbox.br(), color, 2, 8, 0 );
+      cv::Mat img_roi;
+      try
+      {
+      
+        img_roi = img_(bboxes[i]);
+      }
+      catch(std::exception &e)
+      {
+        std::cout << bboxes[i].tl() << bboxes[i].br() << std::endl;
+      }
+      
+      char buf[128];
+      sprintf(buf, "%02d", i);
+      cv::imshow(buf, img_roi);
+    }
 
 
     // Vis
-    img_diff.convertTo(img_diff, CV_8UC1, 255.0);
-    //std::cout << img_diff << std::endl;
-    cv::drawContours(img_mask, contours, -1, cv::Scalar(0, 0, 255), 2);
-    cv::imshow("diff", img_mask);
+    //cv::drawContours(img_mask, contours, -1, cv::Scalar(0, 0, 255), 2);
+    cv::imshow("diff", img_diff);
+    cv::imshow("mask", img_mask);
+    cv::imshow("color", img_);
     cv::waitKey(1);
     //    sensor_msgs::ImagePtr msg_diff = cv_bridge::CvImage(msg->header, "mono8", img_diff).toImageMsg();
 //    pub_image_->publish(msg_diff);
@@ -195,7 +239,11 @@ public:
   void imageCallback(const sensor_msgs::ImageConstPtr &msg,
                      const sensor_msgs::CameraInfoConstPtr &cinfo_msg)
   {
-//    ROS_INFO("Callback.");
+
+    cv_bridge::CvImageConstPtr img_ptr = cv_bridge::toCvShare(msg, "bgr8");
+    img_ptr->image.copyTo(img_);
+    return;
+    //    ROS_INFO("Callback.");
     static int counter = 0;
      
     model_.fromCameraInfo(cinfo_msg);
@@ -204,7 +252,7 @@ public:
     static tf2_ros::TransformBroadcaster br;
     // Covert over cv_bridge
     cv::Mat img_gray, img_roi, img_tag;    
-    cv_bridge::CvImageConstPtr img_ptr = cv_bridge::toCvShare(msg, "bgr8");
+//    cv_bridge::CvImageConstPtr img_ptr = cv_bridge::toCvShare(msg, "bgr8");
     cv::cvtColor(img_ptr->image, img_gray, CV_BGR2GRAY);
    
 
